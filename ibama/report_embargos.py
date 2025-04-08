@@ -3,67 +3,73 @@ import pandas as pd
 import plotly.express as px
 import ast
 
-# Título
-st.title("📊 Dashboard de Embargos Ambientais")
+# Título da aplicação
+st.set_page_config(page_title="Dashboard de Embargos", layout="wide")
+st.title("📊 Dashboard de Embargos Ambientais - IBAMA")
 
-# Carregamento dos dados
+# Função para carregar os dados
 @st.cache_data
 def carregar_dados():
     url = "https://lcsbkt.s3.us-east-2.amazonaws.com/gold/relatorio_estatistico_embargos.csv"
     df = pd.read_csv(url)
     return df
 
+# Função para transformar string-dict em DataFrame
+def parse_dict_column(column, key_name="Chave"):
+    parsed_dict = ast.literal_eval(column)
+    return pd.DataFrame(parsed_dict.items(), columns=[key_name, "Registros"])
+
+# Carrega os dados
 df = carregar_dados()
 
-# Mostra dados brutos se o usuário quiser
-if st.checkbox("🔍 Mostrar dados brutos"):
+# Exibir dados brutos
+with st.expander("🔍 Ver dados brutos"):
     st.dataframe(df)
 
-# Conversão das colunas que estão em formato de string dicionário
-def parse_dict_column(column):
-    return pd.DataFrame(ast.literal_eval(column).items(), columns=[column.name, "Registros"])
-
-# Estados com mais infrações
+# Gráfico de registros por estado
 st.subheader("📍 Registros por Estado")
-estados_df = parse_dict_column(df.loc[0, "Estados"])
+estados_df = parse_dict_column(df.loc[0, "Estados"], key_name="Estado")
 estados_df = estados_df.sort_values(by="Registros", ascending=False)
-fig_estado = px.bar(estados_df.head(15), x="Estados", y="Registros", color="Registros", text="Registros")
+fig_estado = px.bar(estados_df.head(20), x="Estado", y="Registros", color="Registros", text="Registros")
 st.plotly_chart(fig_estado, use_container_width=True)
 
-# Municípios com mais infrações
+# Gráfico de registros por município
 st.subheader("🏙️ Registros por Município")
-municipios_df = parse_dict_column(df.loc[0, "Municípios"])
+municipios_df = parse_dict_column(df.loc[0, "Municípios"], key_name="Município")
 municipios_df = municipios_df.sort_values(by="Registros", ascending=False)
-fig_municipio = px.bar(municipios_df.head(15), x="Municípios", y="Registros", color="Registros", text="Registros")
+fig_municipio = px.bar(municipios_df.head(20), x="Município", y="Registros", color="Registros", text="Registros")
 st.plotly_chart(fig_municipio, use_container_width=True)
 
 # Área total desmatada
 st.subheader("🌱 Área Total Desmatada")
-area = df["Área Total Desmatada"].iloc[0]
-st.metric(label="Área Total Desmatada (ha)", value=f"{float(area):,.2f}")
+area_total = df["Área Total Desmatada"].iloc[0]
+st.metric("Área Total Desmatada (ha)", f"{float(area_total):,.2f}")
 
-# Ano da Infração
-st.subheader("📅 Ano das Infrações")
-anos = df["Ano da Infração"].dropna()
-if not anos.empty:
-    anos_list = eval(anos.iloc[0]) if isinstance(anos.iloc[0], str) else anos.iloc[0]
-    anos_df = pd.DataFrame(anos_list.items(), columns=["Ano", "Registros"])
-    anos_df = anos_df.sort_values("Ano")
+# Gráfico por ano da infração
+st.subheader("📅 Infrações por Ano")
+anos_col = df["Ano da Infração"].dropna()
+if not anos_col.empty and isinstance(anos_col.iloc[0], str):
+    anos_dict = ast.literal_eval(anos_col.iloc[0])
+    anos_df = pd.DataFrame(anos_dict.items(), columns=["Ano", "Registros"])
+    anos_df = anos_df.sort_values(by="Ano")
     fig_ano = px.line(anos_df, x="Ano", y="Registros", markers=True)
     st.plotly_chart(fig_ano, use_container_width=True)
 else:
-    st.info("Sem dados de ano de infração disponíveis.")
+    st.info("Não há dados disponíveis de anos.")
 
-# Artigos da Legislação (se aplicável)
+# Gráfico de artigos da legislação (se disponível)
 if "Artigos da Legislação" in df.columns:
-    st.subheader("📚 Artigos Mais Citados")
-    artigos = df["Artigos da Legislação"].dropna()
-    if not artigos.empty and isinstance(artigos.iloc[0], str):
-        artigos_list = ast.literal_eval(artigos.iloc[0])
-        artigos_df = pd.DataFrame(artigos_list.items(), columns=["Artigo", "Registros"])
-        artigos_df = artigos_df.sort_values("Registros", ascending=False)
-        fig_artigos = px.bar(artigos_df.head(10), x="Artigo", y="Registros", text="Registros", color="Registros")
-        st.plotly_chart(fig_artigos, use_container_width=True)
+    artigos_raw = df["Artigos da Legislação"].dropna()
+    if not artigos_raw.empty and isinstance(artigos_raw.iloc[0], str):
+        try:
+            artigos_dict = ast.literal_eval(artigos_raw.iloc[0])
+            artigos_df = pd.DataFrame(artigos_dict.items(), columns=["Artigo", "Registros"])
+            artigos_df = artigos_df.sort_values(by="Registros", ascending=False)
+            st.subheader("📚 Artigos da Legislação Mais Citados")
+            fig_artigos = px.bar(artigos_df.head(10), x="Artigo", y="Registros", text="Registros", color="Registros")
+            st.plotly_chart(fig_artigos, use_container_width=True)
+        except Exception:
+            st.warning("Não foi possível processar os dados de artigos da legislação.")
 
 # Rodapé
-st.caption("Fonte: IBAMA / Dados processados via AWS S3")
+st.caption("🔗 Fonte: IBAMA • Dados públicos hospedados em AWS S3")
