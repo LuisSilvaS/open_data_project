@@ -10,8 +10,8 @@ st.title("📊 Dashboard de Embargos Ambientais - IBAMA")
 # Função para carregar os dados
 @st.cache_data
 def carregar_dados():
-    url = "https://lcsbkt.s3.us-east-2.amazonaws.com/gold/relatorio_estatistico_embargos.csv"
-    df = pd.read_csv(url)
+    #url = "https://lcsbkt.s3.us-east-2.amazonaws.com/gold/relatorio_estatistico_embargos.csv"
+    df = pd.read_csv('relatorio_estatistico_embargos.csv)
     return df
 
 # Função para transformar string-dict em DataFrame
